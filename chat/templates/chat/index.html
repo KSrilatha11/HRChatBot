@@ -1,0 +1,116 @@
+{% load static %}
+
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR ChatBot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="{% static 'chat/styles.css' %}">
+</head>
+<body>
+    <div id="messages">
+        <div id="messages-header">Welcome! HR Help-Desk..</div>
+        <div id="messages-content"></div>
+        <div id="input-container">
+            <input type="text" id="message" placeholder="Type your query here...">
+            <button id="send">Send</button>
+        </div>
+    </div>
+    <div class="tooltip">Hey, How can I assist you today?</div>
+    <img id="chat-icon" src="https://cdn-icons-png.flaticon.com/128/1786/1786548.png" alt="Chat Icon">
+
+    <script>
+        $(document).ready(function() {
+            var chatActive = true;
+
+            function startChat() {
+                // Clear previous messages and reset chat state
+                $("#messages-content").html("");
+                chatActive = true;
+                $("#input-container").show();
+
+                $("#messages-content").append("<div class='message bot-message'><div class='message-content'>What would you like to choose?</div></div>");
+                displayOptions([
+                    { text: 'HR Policies', value: 'View HR Policies' },
+                    { text: 'HR Queries', value: 'HR Queries' }
+                ]);
+            }
+
+            $("#send").click(function() {
+                if (!chatActive) return;
+
+                var message = $("#message").val();
+                if (message.trim() === "") {
+                    return;
+                }
+                $("#messages-content").append("<div class='message user-message'><div class='message-content'>" + message + "</div></div>");
+                $("#message").val("");
+                sendMessage(message);
+            });
+
+            // Allow pressing Enter to send the message
+            $("#message").keypress(function(e) {
+                if (e.which == 13) {
+                    $("#send").click();
+                    return false;
+                }
+            });
+
+            $("#chat-icon").click(function() {
+                if ($("#messages").is(":visible")) {
+                    $("#messages").hide();
+                    $(".tooltip").show();
+                } else {
+                    $("#messages").show();
+                    startChat();
+                    $(".tooltip").hide();
+                }
+            });
+
+            function sendMessage(userInput) {
+                $.ajax({
+                    url: "{% url 'chatbot_response' %}",
+                    type: "POST",
+                    data: {
+                        'message': userInput,
+                        'csrfmiddlewaretoken': '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        appendBotMessage(response.response.replace(/\n/g, "<br>"), response.options);
+                        $("#messages").scrollTop($("#messages-content")[0].scrollHeight);
+                        if (userInput.toLowerCase() === "Close") {
+                            $("#input-container").hide();
+                            chatActive = false;
+                            $(".option-button").prop("disabled", true).off('click');
+                        }
+                    }
+                });
+            }
+
+            function appendBotMessage(message, options) {
+                $("#messages-content").append("<div class='message bot-message'><div class='message-content'>" + message + "</div></div>");
+                displayOptions(options);
+            }
+
+            function displayOptions(options) {
+                if (options && options.length > 0 && chatActive) {
+                    let optionsHtml = "<div class='options'>";
+                    options.forEach(function(option) {
+                        optionsHtml += "<button class='option-button' onclick='handleOptionClick(\"" + option.value + "\")'>" + option.text + "</button>";
+                    });
+                    optionsHtml += "</div>";
+                    $("#messages-content").append(optionsHtml);
+                }
+            }
+
+            window.handleOptionClick = function(optionValue) {
+                if (!chatActive) return;
+
+                $("#messages-content").append("<div class='message user-message'><div class='message-content'>" + optionValue + "</div></div>");
+                sendMessage(optionValue);
+            };
+        });
+    </script>
+</body>
+</html>
